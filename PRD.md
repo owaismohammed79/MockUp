@@ -6,4 +6,4 @@ A simple application for job seekers to practice for tech interviews
 
 - Next.js
 - Clerk
-- 
+- Argon2
