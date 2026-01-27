@@ -1,0 +1,9 @@
+onlyBuiltDependencies:
+  - '@clerk/shared'
+  - argon2
+packages:
+  - "apps/*"
+  - "packages/*"
+catalogs:
+  prisma:
+    prisma: latest
