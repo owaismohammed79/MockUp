@@ -13,4 +13,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 os.makedirs(settings.upload_dir, exist_ok=True)
-groq_client = Groq(api_key=settings.groq_api_key)
+groq_transcription_client = Groq(api_key=settings.groq_api_key)
