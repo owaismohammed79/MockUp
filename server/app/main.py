@@ -1,10 +1,8 @@
-from fastapi import FastAPI, UploadFile, File 
-import uvicorn
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes import upload
 
-
-app = FastAPI() 
-
+app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -12,15 +10,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health") 
-def handleHome(): 
-        return {"data": "Server is running"} 
+@app.get("/health")
+def healthCheck():
+    return {"data": "Server is running"}
 
-@app.post("/upload") 
-async def handleUpload(file: UploadFile = File(...)): 
-    contents = await file.read() 
-    with open(f"temp_{file.filename}", "wb") as f: 
-        f.write(contents) 
-    return { "filename": file.filename, "content_type": file.content_type } 
-
-uvicorn.run(app)
+app.include_router(upload.router)
