@@ -1,40 +1,55 @@
 import { useRef } from "react";
 
-function useRecorder() {
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
+function useRecorder(onMessage, onAudio) {
+  const mediaRecorderRef = useRef(null)
+  const socketRef = useRef(null)
 
-  const startRecording = async () => {
-    audioChunksRef.current = [];
+  async function startRecording() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const socket = new WebSocket("ws://localhost:8000/ws/interview")
+    socketRef.current = socket
 
-    const recorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = recorder;
+    socket.onopen = () => {
+      const recorder = new MediaRecorder(stream, {mimeType: "audio/webm"})
 
-    recorder.ondataavailable = (e) => {
-      audioChunksRef.current.push(e.data);
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if(event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+          socket.send(event.data)
+        }
+      }
+
+      recorder.onerror = (event) => {
+        console.error(`error recording stream: ${event.error.name}`)
+      }
+
+      recorder.start(300)
     };
 
-    recorder.start();
-  };
+    socket.onmessage = async(event) => {
+      // TEXT
+      if (typeof event.data === "string") {
+        const data = JSON.parse(event.data)
+        onMessage(data)
+      }
+      // AUDIO
+      else {
+        onAudio(event.data)
+      }
+    };
 
-  const stopRecording = async () => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current;
+    socket.onerror = (e) => console.error(e)
+  }
 
-      recorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
-        resolve(blob);
-      };
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
 
-      recorder.stop();
-    });
-  };
+    socketRef.current?.send(JSON.stringify({ type: "end" }))
+  }
 
-  return { startRecording, stopRecording };
+  return { startRecording, stopRecording }
 }
 
 export default useRecorder

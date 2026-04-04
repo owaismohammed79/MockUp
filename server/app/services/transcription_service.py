@@ -21,5 +21,7 @@ async def transcribe_file(filepath: str) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
+def transcribe_chunk(audio_bytes: bytes) -> str:
+    result = transcribe_bytes(audio_bytes)
+    return result.text
     

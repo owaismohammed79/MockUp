@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import upload
+from app.routes import chat
 
 app = FastAPI()
 app.add_middleware(
@@ -14,4 +14,4 @@ app.add_middleware(
 def healthCheck():
     return {"data": "Server is running"}
 
-app.include_router(upload.router)
+app.include_router(chat.router)
