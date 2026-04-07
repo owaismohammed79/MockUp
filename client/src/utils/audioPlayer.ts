@@ -1,7 +1,7 @@
 let audioQueue = [];
 let isPlaying = false;
 
-function playNext() {
+async function playNext() {
   if(audioQueue.length === 0) {
     isPlaying = false
     return
@@ -18,7 +18,17 @@ function playNext() {
     playNext()
   }
 
-  audio.play()
+  audio.onerror = () => {
+    URL.revokeObjectURL(url);
+    playNext();
+  };
+
+  try {
+    await audio.play();
+  } catch (e) {
+    console.error("Playback error:", e);
+    playNext();
+  }
 }
 
 export function handleAudioChunk(chunk) {
