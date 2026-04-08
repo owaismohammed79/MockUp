@@ -1,24 +1,10 @@
 import { useRef } from "react";
-import { useMicVAD } from "@ricky0123/vad-react"
-//import * as ort from "onnxruntime-web"
-
-//ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/"
+import hark from "hark";
 
 function useRecorder(onMessage, onAudio) {
   const mediaRecorderRef = useRef(null)
   const socketRef = useRef(null)
-
-  const vad = useMicVAD({
-    baseAssetPath: "/vad/",
-    onnxWASMBasePath: "/onnx/",
-    minSpeechMs: 300,
-    redemptionMs: 1400,
-    onSpeechEnd: () => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "end" }))
-      }
-    }
-  })
+  const harkRef = useRef(null)
 
   async function startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -27,12 +13,12 @@ function useRecorder(onMessage, onAudio) {
     socketRef.current = socket
 
     socket.onopen = () => {
-      const recorder = new MediaRecorder(stream, {mimeType: "audio/webm"})
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" })
       mediaRecorderRef.current = recorder
 
       recorder.ondataavailable = (event) => {
         if(event.data.size > 0 && socketRef.current?.readyState === WebSocket.OPEN) {
-          socket.send(event.data)
+          socketRef.current.send(event.data)
         }
       }
 
@@ -41,15 +27,26 @@ function useRecorder(onMessage, onAudio) {
       }
 
       recorder.start(250)
-      vad.start()
-    };
+    }
+
+    const speech = hark(stream, {
+        interval: 100,
+        threshold: -50,
+      });
+
+      harkRef.current = speech
+
+      speech.on("stopped_speaking", () => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: "end" }))
+        }
+      })
 
     socket.onmessage = async(event) => {
-      if (typeof event.data === "string") {
+      if(typeof event.data === "string") {
         const data = JSON.parse(event.data)
         onMessage(data)
-      }
-      else {
+      } else {
         onAudio(event.data)
       }
     };
@@ -59,8 +56,9 @@ function useRecorder(onMessage, onAudio) {
 
   function stopRecording() {
     mediaRecorderRef.current?.stop()
+    harkRef.current?.stop()
+    harkRef.current = null
     socketRef.current?.send(JSON.stringify({ type: "end" }))
-    vad.pause()
   }
 
   return { startRecording, stopRecording }

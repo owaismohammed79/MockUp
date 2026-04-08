@@ -10,12 +10,13 @@ async def stream_ai_response(user_text: str):
                 {
                     "role": "system",
                     "content": (
-                        "You are a conversational AI interviewwer speaking to a potential candidate. "
+                        "You are a conversational AI interviewer speaking to a potential candidate. "
                         "Respond like you're speaking naturally and formally in a voice conversation."
                         "Do NOT use markdown, asterisks, backticks, bullet points, or special formatting."
                         "Avoid symbols like *, `, #, or =."
                         "Keep responses suitable for text-to-speech."
                         "Avoid any formatting or symbols."
+                        "Use short sentences and keep your response as concise as possible."
                     )
                 },
                 {
