@@ -72,6 +72,9 @@ async def interview_ws(websocket: WebSocket):
                     if buffer:
                         audio = await synthesize(buffer)
                         await websocket.send_bytes(audio)
+
+                    #clear the audio chunks so that when the turn ends, you don't have audio chunks of prev one
+                    audio_chunks = []
     except WebSocketDisconnect:
         print("Client disconnected")
 

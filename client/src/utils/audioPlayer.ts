@@ -1,9 +1,15 @@
 let audioQueue = [];
 let isPlaying = false;
+let onPlaybackEnd = null
+
+export function setOnPlaybackEnd(callback) {
+  onPlaybackEnd = callback
+}
 
 async function playNext() {
   if(audioQueue.length === 0) {
     isPlaying = false
+    if(onPlaybackEnd) onPlaybackEnd()
     return
   }
 
