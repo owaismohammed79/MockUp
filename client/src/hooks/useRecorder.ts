@@ -52,6 +52,7 @@ function useRecorder(onMessage, onAudio) {
 
       speech.on("stopped_speaking", () => {
         if (socketRef.current?.readyState === WebSocket.OPEN && !isAISpeakingRef.current && mediaRecorderRef.current?.state === "recording") {
+          //This had to be called first and then use the recorder.onstop event for blob creation, otherwise the created blob wont have required metadata
           mediaRecorderRef.current.stop()
         }
       })

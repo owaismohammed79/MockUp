@@ -41,7 +41,7 @@ def synthesize_sync(text: str) -> bytes:
             name="en-IN-Wavenet-D"
         ),
         audio_config=texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+            audio_encoding=texttospeech.AudioEncoding.MP3,   #Lower latency in mp3 due to compression
             speaking_rate=1.0,
             pitch=0.0,
         ),
@@ -49,5 +49,7 @@ def synthesize_sync(text: str) -> bytes:
     return response.audio_content
 
 
-async def synthesize(text: str) -> bytes:
-    return await asyncio.to_thread(synthesize_sync, text)
+async def synthesize_and_send(text: str, websocket) -> bytes:
+    audio = await asyncio.to_thread(synthesize_sync, text)
+    if audio:
+        await websocket.send_bytes(audio)
