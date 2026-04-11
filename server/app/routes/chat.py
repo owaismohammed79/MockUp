@@ -29,6 +29,19 @@ router = APIRouter()
 async def interview_ws(websocket: WebSocket):
     await websocket.accept()
     audio_chunks = []
+    consumer_task = None
+    tts_queue = asyncio.Queue()
+
+    async def tts_consumer():
+        try:
+            while True:
+                sentence = await tts_queue.get()
+                if sentence is None:
+                    break
+                await synthesize_and_send(sentence, websocket)
+                tts_queue.task_done()
+        except Exception as e:
+            print(f"tts consumer error: {e}")
 
     try:
         while True:
@@ -41,6 +54,8 @@ async def interview_ws(websocket: WebSocket):
                 data = json.loads(msg["text"])
                 if data["type"] == "end":
                     full_audio = b"".join(audio_chunks)
+                    #clear the audio chunks so that when the turn starts, you don't have audio chunks of prev one
+                    audio_chunks = []
 
                     result = await asyncio.to_thread(transcribe_bytes, full_audio)
                     transcript = result.text
@@ -49,15 +64,6 @@ async def interview_ws(websocket: WebSocket):
                         "type": "transcript",
                         "text": transcript
                     })
-
-                    tts_queue = asyncio.Queue()
-
-                    async def tts_consumer():
-                        while True:
-                            sentence = await tts_queue.get()
-                            if sentence is None:
-                                break
-                            await synthesize_and_send(sentence, websocket)
 
                     consumer_task = asyncio.create_task(tts_consumer())
 
@@ -73,7 +79,7 @@ async def interview_ws(websocket: WebSocket):
                         buffer += token
 
                         # chunk sentence
-                        if any(p in buffer for p in [".", "?", "!"]) and len(buffer) > 30:
+                        if any(p in buffer for p in [".", "?", "!"]):
                             await tts_queue.put(buffer)
                             buffer = ""
 
@@ -84,8 +90,11 @@ async def interview_ws(websocket: WebSocket):
                     await tts_queue.put(None)
                     await consumer_task
 
-                    #clear the audio chunks so that when the turn ends, you don't have audio chunks of prev one
-                    audio_chunks = []
+                    await websocket.send_json({
+                        "type": "ai_turn_complete",
+                        "text": None
+                    })
+
     except WebSocketDisconnect:
         print("Client disconnected")
 
