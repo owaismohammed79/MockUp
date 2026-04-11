@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import hark from "hark";
-import { setOnPlaybackEnd } from "../utils/audioPlayer"
+import { initMSE, setOnPlaybackEnd, signalEndOfStream} from "../utils/audioPlayer"
 
 function useRecorder(onMessage, onAudio) {
   const mediaRecorderRef = useRef(null)
@@ -11,8 +11,10 @@ function useRecorder(onMessage, onAudio) {
 
   async function startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    initMSE()
 
     const socket = new WebSocket("ws://localhost:8000/ws/interview")
+    socket.binaryType = "arraybuffer"
     socketRef.current = socket
 
     socket.onopen = () => {
@@ -26,11 +28,15 @@ function useRecorder(onMessage, onAudio) {
       }
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, {type: "audio/webm;codecs=opus"})
-        chunksRef.current = []
+        if(chunksRef.current.length > 0) {
+          const blob = new Blob(chunksRef.current, {type: "audio/webm;codecs=opus"})
+          chunksRef.current = []
 
-        socketRef.current.send(blob)
-        socketRef.current.send(JSON.stringify({ type: "end" }))
+          socketRef.current.send(blob)
+          socketRef.current.send(JSON.stringify({ type: "end" }))
+        } else{
+          console.log("No audio detected")
+        }
 
         if(!isAISpeakingRef.current) {
           recorder.start(250)
@@ -46,8 +52,7 @@ function useRecorder(onMessage, onAudio) {
       const speech = hark(stream, {
         interval: 100,
         threshold: -50,
-      });
-
+      })
       harkRef.current = speech
 
       speech.on("stopped_speaking", () => {
@@ -61,20 +66,23 @@ function useRecorder(onMessage, onAudio) {
     socket.onmessage = async(event) => {
       if(typeof event.data === "string") {
         const data = JSON.parse(event.data)
+        if(data.type === "ai_turn_complete") signalEndOfStream()
         onMessage(data)
       } else {
         //Audio chunk recieved, meaning AI is speaking
         isAISpeakingRef.current = true
         onAudio(event.data)
       }
-    };
+    }
 
     socket.onerror = (e) => console.error(e)
 
     setOnPlaybackEnd(() => {
       isAISpeakingRef.current = false
+      //re init new buffer
+      initMSE()
       if(mediaRecorderRef.current?.state === "inactive") {
-        mediaRecorderRef.current.start(250)
+        mediaRecorderRef.current.start(250);
       }
     })
   }
