@@ -4,17 +4,26 @@ let queue = []
 let audio = new Audio()
 let isAppending = false
 let onPlaybackEnd = null
+let objectUrl = null
 
 export function setOnPlaybackEnd(callback) {
   onPlaybackEnd = callback
 }
 
 export function initMSE() {
-  mediaSource = new MediaSource()
-  audio.src = URL.createObjectURL(mediaSource)
+  if(mediaSource && mediaSource.readyState !== 'closed' && sourceBuffer) return
 
-  audio.onended = () => {
-    if(onPlaybackEnd) onPlaybackEnd()
+    if(objectUrl) {
+      URL.revokeObjectURL(objectUrl)
+      objectUrl = null
+    }
+
+  mediaSource = new MediaSource()
+  objectUrl = URL.createObjectURL(mediaSource)
+  audio.src = objectUrl
+
+  audio.onwaiting = () => {
+    if(onPlaybackEnd && !isAppending && queue.length === 0) onPlaybackEnd()
   }
 
   mediaSource.addEventListener('sourceopen', () => {
@@ -26,7 +35,7 @@ export function initMSE() {
         processQueue()
       }
     })
-  })
+  }, {once: true})
   audio.play().catch(e => console.error("MSE Playback Error:", e))
 }
 
@@ -48,7 +57,7 @@ export function handleAudioChunk(chunk) {
 }
 
 export function signalEndOfStream() {
-  if (mediaSource && mediaSource.readyState === 'open') {
+  if(mediaSource && mediaSource.readyState === 'open') {
     //wait until buffer isnt updating before closing 
     if(!sourceBuffer.updating) {
       mediaSource.endOfStream()
