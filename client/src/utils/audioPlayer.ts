@@ -56,6 +56,23 @@ export function handleAudioChunk(chunk) {
   }
 }
 
+export function flushBuffer() {
+  queue = [] //clear existing chunks
+  isAppending = false
+
+  if(sourceBuffer && !sourceBuffer.updating && mediaSource.readyState === 'open') {
+    try {
+      //remove all upcoming audio from buffer
+      sourceBuffer.remove(0, 1000000) 
+      
+      //reset audio to the last timestamp if buffer exists otherwise shift it to 0th millisec
+      audio.currentTime = audio.buffered.length > 0 ? audio.buffered.end(0) : 0
+    } catch (e) {
+      console.log("Flush failed, ", e)
+    }
+  }
+}
+
 export function signalEndOfStream() {
   if(mediaSource && mediaSource.readyState === 'open') {
     //wait until buffer isnt updating before closing 
@@ -67,4 +84,9 @@ export function signalEndOfStream() {
       }, { once: true })
     }
   }
+}
+
+export function stopPlayback() {
+  audio.pause()
+  flushBuffer()
 }
