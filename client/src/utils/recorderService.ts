@@ -13,6 +13,7 @@ export function createRecorderService(stream: MediaStream,callbacks: RecorderCal
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         chunks.push(event.data)
+        console.log("found audio chunks")
       }
     }
 

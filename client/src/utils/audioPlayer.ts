@@ -85,8 +85,3 @@ export function signalEndOfStream() {
     }
   }
 }
-
-export function stopPlayback() {
-  audio.pause()
-  flushBuffer()
-}

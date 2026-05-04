@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { createSocketService } from "../utils/socketService"
 import { createRecorderService } from "../utils/recorderService"
 import { createVADService } from "../utils/vadService"
-import { initMSE, setOnPlaybackEnd, signalEndOfStream, stopPlayback, handleAudioChunk, flushBuffer } from "../utils/audioPlayer"
+import { initMSE, setOnPlaybackEnd, signalEndOfStream, handleAudioChunk, flushBuffer } from "../utils/audioPlayer"
 
 function useInterview(onMessage) {
   const socketRef = useRef(null)
@@ -10,6 +10,7 @@ function useInterview(onMessage) {
   const vadRef = useRef(null)
   const isAISpeakingRef = useRef(false)
   const streamRef = useRef(null)
+  const isInterviewActiveRef = useRef(false)
 
   async function getStream() {
     if(!streamRef.current) {
@@ -21,13 +22,11 @@ function useInterview(onMessage) {
     return streamRef.current
   }
 
-  async function calibrateMic() {
-    const stream = await getStream()
-    if(!vadRef.current) vadRef.current = createVADService(stream)
-    return await vadRef.current.calibrate(3000)
-  }
 
   async function startInterview() {
+    isInterviewActiveRef.current = true
+    isAISpeakingRef.current = false
+
     const stream = await getStream()
     initMSE()
 
@@ -51,6 +50,7 @@ function useInterview(onMessage) {
         socket.sendJson({ type: "end" })
       },
       onStop: () => {
+        if(!isInterviewActiveRef.current) return
         if(!isAISpeakingRef.current) {
           recorder.start()
         }
@@ -93,14 +93,17 @@ function useInterview(onMessage) {
   }
 
   function stopInterview() {
+    isInterviewActiveRef.current = false
     mediaRecorderRef.current?.stop()
     vadRef.current?.stop()
+    vadRef.current = null
+
     socketRef.current?.sendJson({ type: "end" })
     socketRef.current?.disconnect()
     signalEndOfStream()
   }
 
-  return { startInterview, stopInterview, calibrateMic }
+  return { startInterview, stopInterview }
 }
 
 export default useInterview

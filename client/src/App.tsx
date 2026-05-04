@@ -1,8 +1,8 @@
-import { useState } from "react"
 import useInterview from "./hooks/useInterview"
 
 function App() {
-  const [status, setStatus] = useState("idle")
+    const [status, setStatus] = useState<"idle" | "active">("idle")
+
 
   const handleMessage = (data) => {
     if(data.type === "transcript") {
@@ -14,13 +14,10 @@ function App() {
     }
   }
 
-  const {startInterview, stopInterview, calibrateMic} = useInterview(handleMessage)
+  const {startInterview, stopInterview } = useInterview(handleMessage)
 
   const handleStart = async () => {
     try {
-      setStatus("calibrating")
-      await calibrateMic()
-      
       setStatus("active")
       await startInterview() 
     } catch (err) {
@@ -36,9 +33,8 @@ function App() {
 
   return (
     <>
-      {status === "calibrating" ? <p>Calibrating Mic, please wait...</p> : null}
-      <button onClick={handleStart}>Start</button>
-      <button onClick={handleStop}>Stop</button>
+      <button onClick={handleStart} disabled={status === "active"}>Start</button>
+      <button onClick={handleStop} disabled={status === "idle"}>Stop</button>
     </>
   )
 }
