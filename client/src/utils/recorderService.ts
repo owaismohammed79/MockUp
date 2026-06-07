@@ -1,5 +1,5 @@
 type RecorderCallbacks = {
-  onCommit: (blob: Blob) => void  // called when recorder stops with real audio
+  onCommit: (blob: Blob) => void  // called when recorder stops with audio
   onStop: () => void               // called after commit, so caller can restart
 }
 
@@ -13,7 +13,6 @@ export function createRecorderService(stream: MediaStream,callbacks: RecorderCal
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         chunks.push(event.data)
-        console.log("found audio chunks")
       }
     }
 
@@ -23,16 +22,16 @@ export function createRecorderService(stream: MediaStream,callbacks: RecorderCal
         chunks.length = 0
         callbacks.onCommit(blob)
       } else {
-        console.log("[Recorder] No audio detected, skipping commit")
+        console.log("Recorder deected no audio, skipping commit")
       }
       callbacks.onStop()
     }
 
     recorder.onerror = (event) => {
-      console.error(`[Recorder] Error: ${event.error.name}`)
+      console.error(`Recorder error: ${event.error.name}`)
     }
 
-    recorder.start(250)
+    recorder.start()
   }
 
   function stop() {

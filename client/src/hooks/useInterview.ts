@@ -11,6 +11,7 @@ function useInterview(onMessage) {
   const isAISpeakingRef = useRef(false)
   const streamRef = useRef(null)
   const isInterviewActiveRef = useRef(false)
+  const silenceTimeRef = useRef(null)
 
   async function getStream() {
     if(!streamRef.current) {
@@ -62,6 +63,13 @@ function useInterview(onMessage) {
 
     const vadCallbacks = {
       onSpeakingStart: () => {
+        if(silenceTimeRef.current) {
+          clearTimeout(silenceTimeRef.current)
+          silenceTimeRef.current = null
+          console.log("User continued speaking")
+          return
+        }
+
         if(!isAISpeakingRef.current) return
         console.log("User tried to interrupt")
         flushBuffer()
@@ -71,9 +79,15 @@ function useInterview(onMessage) {
       },
       onSpeakingEnd: () => {
         const isRecording = mediaRecorderRef.current?.getState() === "recording"
-        console.log("User stopped speaking")
         if(socketRef.current?.isOpen() && !isAISpeakingRef.current && isRecording) {
-          mediaRecorderRef.current.stop()
+          console.log("User quiet... waiting 1 sec to confirm")
+          if(silenceTimeRef.current) clearTimeout(silenceTimeRef.current)
+          
+          silenceTimeRef.current = setTimeout(() => {
+            console.log("Silence confirmed, stopping recorder")
+            mediaRecorderRef.current.stop()
+            silenceTimeRef.current = null
+          }, 2000)
         }
       },
     }

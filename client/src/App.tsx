@@ -1,4 +1,5 @@
 import useInterview from "./hooks/useInterview"
+import { useState } from "react"
 
 function App() {
     const [status, setStatus] = useState<"idle" | "active">("idle")
