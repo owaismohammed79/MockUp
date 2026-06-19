@@ -40,5 +40,3 @@ async def stream_ai_response(user_text: str):
 
     except Exception as e:
          raise HTTPException(status_code=500, detail=str(e))
-
-

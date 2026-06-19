@@ -80,7 +80,7 @@ function useInterview(onMessage) {
       onSpeakingEnd: () => {
         const isRecording = mediaRecorderRef.current?.getState() === "recording"
         if(socketRef.current?.isOpen() && !isAISpeakingRef.current && isRecording) {
-          console.log("User quiet... waiting 1 sec to confirm")
+          console.log("User quiet... waiting 2 secs to confirm")
           if(silenceTimeRef.current) clearTimeout(silenceTimeRef.current)
           
           silenceTimeRef.current = setTimeout(() => {

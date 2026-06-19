@@ -1,11 +1,13 @@
+from __future__ import annotations
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from ..services.file_service import save_file
 from ..services.ai_service import stream_ai_response
-from ..services.transcription_service import transcribe_bytes, transcribe_file
+from ..services.transcription_service import transcribe_bytes, is_no_speech
 from ..services.tts_service import synthesize_and_send
-from ..config.config import settings
 import json
 import asyncio
+import logging
+from ..services.vad_service import contains_speech
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -14,7 +16,6 @@ async def interview_ws(websocket: WebSocket):
     await websocket.accept()
     audio_chunks = []
     ai_turn_task = None
-    tts_queue = asyncio.Queue()
 
     async def run_ai_turn(transcript: str):
         tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -27,8 +28,10 @@ async def interview_ws(websocket: WebSocket):
                         break
                     await synthesize_and_send(sentence, websocket)
                     tts_queue.task_done()
+            except asyncio.CancelledError:
+                pass
             except Exception as e:
-                print(f"tts consumer error: {e}")
+                logger.exception(f"tts consumer error: {e}")
             
         consumer_task = asyncio.create_task(tts_consumer())
 
@@ -42,7 +45,7 @@ async def interview_ws(websocket: WebSocket):
                     await tts_queue.put(buffer)
                     buffer = ""
 
-            if buffer:
+            if buffer.strip():
                 await tts_queue.put(buffer)
 
             await tts_queue.put(None)
@@ -63,7 +66,7 @@ async def interview_ws(websocket: WebSocket):
             except asyncio.CancelledError:
                 pass
 
-            print("AI turn cancelled")
+            logger.info("AI turn cancelled by barge in")
             raise  #so that we know that the tts was cancelled rather than completing successfully  
 
     try:
@@ -72,7 +75,7 @@ async def interview_ws(websocket: WebSocket):
 
             if msg.get("bytes"):
                 audio_chunks.append(msg["bytes"])
-                print("Audio chunks recieving")
+                logger.debug("Audio chunk received (%d bytes)", len(msg["bytes"]))
 
             elif msg.get("text"):
                 data = json.loads(msg["text"])
@@ -87,22 +90,44 @@ async def interview_ws(websocket: WebSocket):
                     audio_chunks = []
 
                 elif data["type"] == "end":
+                    if not audio_chunks:
+                        logger.warning("Chat end received with no audio chunks ,ignored")
+                        continue
+
                     full_audio = b"".join(audio_chunks)
                     print("Complete audio found")
                     #clear the audio chunks so that when the turn starts, you don't have audio chunks of prev one
                     audio_chunks = []
 
-                    result = await asyncio.to_thread(transcribe_bytes, full_audio)
-                    transcript = result.text
-                    print("Transcription of audio done:", transcript)
+                    try:
+                        has_speech, max_vad_prob = await asyncio.to_thread(contains_speech, full_audio)
+                    except ValueError as e:
+                        logger.warning("vad Audio decode failed: %s", e)
+                        has_speech = False
+                        max_vad_prob = 0.0
+ 
+                    if not has_speech:
+                        logger.info("vad rejected audio (max_prob=%.3f), sending no_speech", max_vad_prob,)
+                        await websocket.send_json({"type": "no_speech"})
+                        continue
+ 
+                    logger.info("vad passed, sending to stt", max_vad_prob)
 
-                    await websocket.send_json({
-                        "type": "transcript",
-                        "text": transcript
-                    })
-                    print("Sent transcript")
+                    result = await asyncio.to_thread(transcribe_bytes, full_audio)
+                    if is_no_speech(result):
+                        logger.info("stt rejected transcript, sending no_speech")
+                        await websocket.send_json({"type": "no_speech"})
+                        continue
+ 
+                    transcript= result.text.strip()
+                    logger.info("stt transcript: %r", transcript)
+
+                    await websocket.send_json({"type": "transcript", "text": transcript})
 
                     ai_turn_task = asyncio.create_task(run_ai_turn(transcript))
+                
+                else:
+                    logger.debug("Unknown msg type: %r", data["type"])
 
     except WebSocketDisconnect:
         print("Client disconnected")
