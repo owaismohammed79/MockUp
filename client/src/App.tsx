@@ -1,5 +1,6 @@
 import useInterview from "./hooks/useInterview"
 import { useState } from "react"
+import ResumeUpload from "./components/ResumeUpload"
 
 function App() {
     const [status, setStatus] = useState<"idle" | "active">("idle")
@@ -36,6 +37,7 @@ function App() {
     <>
       <button onClick={handleStart} disabled={status === "active"}>Start</button>
       <button onClick={handleStop} disabled={status === "idle"}>Stop</button>
+      <ResumeUpload />
     </>
   )
 }
