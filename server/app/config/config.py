@@ -1,10 +1,8 @@
 from pydantic_settings import BaseSettings
 from groq import Groq
-import os
 
 
 class Settings(BaseSettings):
-    upload_dir: str
     groq_api_key: str
     groq_llm_api_key: str
 
@@ -13,6 +11,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-os.makedirs(settings.upload_dir, exist_ok=True)
 groq_transcription_client = Groq(api_key=settings.groq_api_key)
 groq_llm_client = Groq(api_key=settings.groq_llm_api_key)

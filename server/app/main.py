@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import chat
+from app.routes import interview_session
 from app.services.vad_service import load_model
 logger = logging.getLogger(__name__)
 
@@ -30,4 +30,4 @@ app.add_middleware(
 def healthCheck():
     return {"data": "Server is running"}
 
-app.include_router(chat.router)
+app.include_router(interview_session.router)
