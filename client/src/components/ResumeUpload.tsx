@@ -23,7 +23,7 @@ const ResumeUpload: React.FC = () => {
 
     if(!isValidType) {
       setSelectedFile(null)
-      setErrorMessage('Invalid file type. Please upload a PDF, DOCX, or DOC resume')
+      setErrorMessage('Invalid file type. Please upload resume in PDF or DOCX filetype')
       event.target.value = '' 
       return
     }
@@ -53,7 +53,7 @@ const ResumeUpload: React.FC = () => {
     formData.append('resume', selectedFile)
 
     try {
-      const res = await axios.post<UploadResponse>("https://api.example.com/upload-resume", formData)
+      const res = await axios.post<UploadResponse>(`${import.meta.env.VITE_API_URL}/resume/parse`, formData)
 
       setUploadSuccess(true)
       console.log('Upload successful. Data:', res.data);

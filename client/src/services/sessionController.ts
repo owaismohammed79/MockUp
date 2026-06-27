@@ -1,7 +1,7 @@
-import { createSocketService } from "../utils/socketService"
-import { createRecorderService } from "../utils/recorderService"
-import { createVADService } from "../utils/vadService"
-import { initMSE, setOnPlaybackEnd, signalEndOfStream, handleAudioChunk, flushBuffer } from "../utils/audioPlayer"
+import { createSocketService } from "./socketService"
+import { createRecorderService } from "./recorderService"
+import { createVADService } from "./vadService"
+import { initMSE, setOnPlaybackEnd, signalEndOfStream, handleAudioChunk, flushBuffer } from "./audioPlayerService"
 
 type SessionMessage = { type: string; text?: string }
 
