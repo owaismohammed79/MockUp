@@ -19,8 +19,9 @@ async def run_ai_turn(websocket: WebSocket, transcript: str):
                     break
                 await synthesize_and_send(sentence, websocket)
                 tts_queue.task_done()
-        except asyncio.CancelledError:
-            pass
+        except asyncio.CancelledError: # this is because we need to handoff the control back to uvicorn to end the server
+            raise
+
         except Exception as e:
             logger.exception(f"tts consumer error: {e}")
 

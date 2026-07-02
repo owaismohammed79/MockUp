@@ -81,6 +81,14 @@ async def interview_ws(websocket: WebSocket):
     except WebSocketDisconnect:
         print("Client disconnected")
 
+    except asyncio.CancelledError:
+        print("Server is shutting down, killing websocket...")
+        raise
+
     except Exception as e:
         print("Error:", e)
         await websocket.close(code=1011)
+    
+    finally:
+        if ai_turn_task and not ai_turn_task.done():
+            ai_turn_task.cancel()

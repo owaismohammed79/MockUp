@@ -53,16 +53,16 @@ const ResumeUpload: React.FC = () => {
     formData.append('resume', selectedFile)
 
     try {
-      const res = await axios.post<UploadResponse>(`${import.meta.env.VITE_API_URL}/resume/parse`, formData)
+      const result = await axios.post(`${import.meta.env.VITE_API_URL}/resume/parse`, formData)
 
       setUploadSuccess(true)
-      console.log('Upload successful. Data:', res.data);
+      console.log('Upload successful. Data:', result.data.text);
       
       // proceedToInterview(res.data.sessionId);
     } catch (error) {
       console.error('Upload error:', error)
       if(axios.isAxiosError(error)) {
-        const msg = error.response?.data?.message || error.message
+        const msg = error.response?.data?.detail
         setErrorMessage(`Upload failed: ${msg}`)
       } else {
         setErrorMessage("Some error occured in uploading file")

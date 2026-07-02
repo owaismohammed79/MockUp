@@ -5,6 +5,7 @@ from groq import Groq
 class Settings(BaseSettings):
     groq_api_key: str
     groq_llm_api_key: str
+    frontend_url: str
 
     class Config:
         env_file = ".env"
