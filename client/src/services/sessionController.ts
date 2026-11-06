@@ -3,9 +3,17 @@ import { createRecorderService } from "./recorderService"
 import { createVADService } from "./vadService"
 import { initMSE, setOnPlaybackEnd, signalEndOfStream, handleAudioChunk, flushBuffer } from "./audioPlayerService"
 
-type SessionMessage = { type: string; text?: string }
+type SessionMessage = {
+  type: string
+  text?: string
+  ends_at?: number
+  questions_asked?: number
+  question_cap?: number
+  message?: string
+  id?: string
+}
 
-export function createSessionController(onMessage: (data: SessionMessage) => void) {
+export function createSessionController(sessionId: string, onMessage: (data: SessionMessage) => void) {
   let socket: ReturnType<typeof createSocketService> | null = null
   let mediaRecorder: ReturnType<typeof createRecorderService> | null = null
   let vad: ReturnType<typeof createVADService> | null = null
@@ -13,7 +21,16 @@ export function createSessionController(onMessage: (data: SessionMessage) => voi
 
   let isAISpeaking = false
   let isInterviewActive = false
+  let closing = false
+  let turnHadAudio = false
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
+
+  function armListening() {
+    if (!isInterviewActive || closing || isAISpeaking) return
+    if (mediaRecorder?.getState() === "inactive" || mediaRecorder?.getState() === null) {
+      mediaRecorder?.start()
+    }
+  }
 
   async function getStream(): Promise<MediaStream> {
     if (!stream) {
@@ -21,29 +38,43 @@ export function createSessionController(onMessage: (data: SessionMessage) => voi
         audio: { echoCancellation: true, noiseSuppression: true }
       })
     }
-    console.log("Stream found")
     return stream
   }
 
   async function start() {
     isInterviewActive = true
-    isAISpeaking = false
+    isAISpeaking = true
+    closing = false
+    turnHadAudio = false
 
     const audioStream = await getStream()
     initMSE()
 
-    socket = createSocketService({
+    socket = createSocketService(sessionId, {
       onMessage: (data) => {
         onMessage(data)
+        if (data.type === "ai_turn_complete" && !turnHadAudio) {
+          isAISpeaking = false
+          armListening()
+        }
+        if (data.type === "ai_turn_complete") {
+          turnHadAudio = false
+        }
+        if (data.type === "session_ended") {
+          closing = true
+          isInterviewActive = false
+          vad?.stop()
+          socket?.disconnect()
+          signalEndOfStream()
+        }
       },
       onAudioChunk: (chunk) => {
+        turnHadAudio = true
         isAISpeaking = true
         handleAudioChunk(chunk)
       },
     })
     await socket.connect()
-
-    console.log("Websocket connection established")
 
     mediaRecorder = createRecorderService(audioStream, {
       onCommit: (blob) => {
@@ -51,39 +82,40 @@ export function createSessionController(onMessage: (data: SessionMessage) => voi
         socket!.sendJson({ type: "end" })
       },
       onStop: () => {
-        if (!isInterviewActive) return
+        if (!isInterviewActive) {
+          socket?.sendJson({ type: "stop" })
+          return
+        }
+        if (closing) {
+          socket?.sendJson({ type: "time_up" })
+          return
+        }
         if (!isAISpeaking) {
           mediaRecorder!.start()
         }
       },
     })
-    mediaRecorder.start()
-    console.log("Recorder starting to record")
 
     const vadCallbacks = {
       onSpeakingStart: () => {
         if (silenceTimer) {
           clearTimeout(silenceTimer)
           silenceTimer = null
-          console.log("User continued speaking")
           return
         }
 
         if (!isAISpeaking) return
-        console.log("User tried to interrupt")
         flushBuffer()
         socket!.sendJson({ type: "barge_in" })
         isAISpeaking = false
-        if (mediaRecorder!.getState() === "inactive") mediaRecorder!.start()
+        if (mediaRecorder!.getState() !== "recording") mediaRecorder!.start()
       },
       onSpeakingEnd: () => {
         const isRecording = mediaRecorder?.getState() === "recording"
-        if (socket?.isOpen() && !isAISpeaking && isRecording) {
-          console.log("User quiet... waiting 2 secs to confirm")
+        if (socket?.isOpen() && !isAISpeaking && isRecording && !closing) {
           if (silenceTimer) clearTimeout(silenceTimer)
 
           silenceTimer = setTimeout(() => {
-            console.log("Silence confirmed, stopping recorder")
             mediaRecorder!.stop()
             silenceTimer = null
           }, 2000)
@@ -99,22 +131,30 @@ export function createSessionController(onMessage: (data: SessionMessage) => voi
 
     setOnPlaybackEnd(() => {
       isAISpeaking = false
-      if (mediaRecorder?.getState() === "inactive") {
-        mediaRecorder.start()
-      }
+      armListening()
     })
+  }
+
+  function timeUp() {
+    closing = true
+    if (mediaRecorder?.getState() === "recording") {
+      mediaRecorder.stop()
+      return
+    }
+    socket?.sendJson({ type: "time_up" })
   }
 
   function stop() {
     isInterviewActive = false
+    const recording = mediaRecorder?.getState() === "recording"
     mediaRecorder?.stop()
     vad?.stop()
     vad = null
 
-    socket?.sendJson({ type: "end" })
-    socket?.disconnect()
-    signalEndOfStream()
+    if (!recording) {
+      socket?.sendJson({ type: "stop" })
+    }
   }
 
-  return { start, stop }
+  return { start, stop, timeUp }
 }

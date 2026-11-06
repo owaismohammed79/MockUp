@@ -1,15 +1,24 @@
 type SocketCallbacks = {
-  onMessage: (data: any) => void
+  onMessage: (data: { type: string; text?: string; ends_at?: number; questions_asked?: number; question_cap?: number; message?: string; id?: string }) => void
   onAudioChunk: (chunk: ArrayBuffer) => void
   onError?: (e: Event) => void
 }
 
-export function createSocketService(callbacks: SocketCallbacks) {
-  let socket = null
+function socketUrl(sessionId: string) {
+  const http = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
+  const url = new URL(http)
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+  url.pathname = `/ws/interview/${sessionId}`
+  url.search = ""
+  return url.toString()
+}
+
+export function createSocketService(sessionId: string, callbacks: SocketCallbacks) {
+  let socket: WebSocket | null = null
 
   function connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      socket = new WebSocket("ws://localhost:8000/ws/interview")
+      socket = new WebSocket(socketUrl(sessionId))
       socket.binaryType = "arraybuffer"
 
       socket.onopen = () => resolve()
